@@ -274,6 +274,7 @@ void
 proc_exit(int sig) {
 	int status;
 	int saved_errno = errno;
+	pid_t pid;
 
 	if (status_filter_opt && (terminating == 0)) {
 		if (waitpid(status_pid, &status, WNOHANG) > 0) {
@@ -290,22 +291,25 @@ proc_exit(int sig) {
 		}
 	}
 
-	if (waitpid(child_pid, &status, 0) != -1) {
-		child_status = status;
+	while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
+    if (pid == child_pid) {
+        child_status = status;
 
-		if ((!noninteractive_opt) && (termios_set))
-			tcsetattr(STDIN_FILENO, TCSADRAIN, &canonical_tty);
+        if ((!noninteractive_opt) && (termios_set))
+            tcsetattr(STDIN_FILENO, TCSADRAIN, &canonical_tty);
 
-		if ((oneshot_opt == 1) && (terminating == 0)) {
-			if (restart_opt == 0)
-				print_child_status(child_status);
+        if ((oneshot_opt == 1) && (terminating == 0)) {
+            if (restart_opt == 0)
+                print_child_status(child_status);
 
-			if (WIFSIGNALED(child_status))
-				_exit(128 + WTERMSIG(child_status));
-			else
-				_exit(WEXITSTATUS(child_status));
-		}
-	}
+            if (WIFSIGNALED(child_status))
+                _exit(128 + WTERMSIG(child_status));
+            else
+                _exit(WEXITSTATUS(child_status));
+        }
+    }
+}
+
 	/* restore errno so that the resuming code is unimpacted. */
 	errno = saved_errno;
 }
